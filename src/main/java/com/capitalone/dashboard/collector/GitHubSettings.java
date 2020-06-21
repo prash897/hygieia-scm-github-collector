@@ -16,6 +16,7 @@ public class GitHubSettings {
     private String proxyPort;
     private String proxyUser;
     private String proxyPassword;
+    @Value("${github.cron}")
     private String cron;
     private String host;
     private String key;

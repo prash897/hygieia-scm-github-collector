@@ -1,20 +1,18 @@
 package com.capitalone.dashboard.collector;
 
 
-import com.capitalone.dashboard.misc.HygieiaException;
-import com.capitalone.dashboard.model.CollectionError;
-import com.capitalone.dashboard.model.Collector;
-import com.capitalone.dashboard.model.CollectorItem;
-import com.capitalone.dashboard.model.CollectorType;
-import com.capitalone.dashboard.model.Commit;
-import com.capitalone.dashboard.model.CommitType;
-import com.capitalone.dashboard.model.GitHubRepo;
-import com.capitalone.dashboard.model.GitRequest;
-import com.capitalone.dashboard.repository.BaseCollectorRepository;
-import com.capitalone.dashboard.repository.CommitRepository;
-import com.capitalone.dashboard.repository.ComponentRepository;
-import com.capitalone.dashboard.repository.GitHubRepoRepository;
-import com.capitalone.dashboard.repository.GitRequestRepository;
+import java.net.MalformedURLException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -28,17 +26,20 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 
-import java.net.MalformedURLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+import com.capitalone.dashboard.misc.HygieiaException;
+import com.capitalone.dashboard.model.CollectionError;
+import com.capitalone.dashboard.model.Collector;
+import com.capitalone.dashboard.model.CollectorItem;
+import com.capitalone.dashboard.model.CollectorType;
+import com.capitalone.dashboard.model.Commit;
+import com.capitalone.dashboard.model.CommitType;
+import com.capitalone.dashboard.model.GitHub;
+import com.capitalone.dashboard.model.GitRequest;
+import com.capitalone.dashboard.repository.BaseCollectorRepository;
+import com.capitalone.dashboard.repository.CommitRepository;
+import com.capitalone.dashboard.repository.ComponentRepository;
+import com.capitalone.dashboard.repository.GitHubRepository;
+import com.capitalone.dashboard.repository.GitRequestRepository;
 
 /**
  * CollectorTask that fetches Commit information from GitHub
@@ -48,7 +49,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
     private static final Log LOG = LogFactory.getLog(GitHubCollectorTask.class);
 
     private final BaseCollectorRepository<Collector> collectorRepository;
-    private final GitHubRepoRepository gitHubRepoRepository;
+    private final GitHubRepository gitHubRepoRepository;
     private final CommitRepository commitRepository;
     private final GitRequestRepository gitRequestRepository;
     private final GitHubClient gitHubClient;
@@ -61,7 +62,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
     @Autowired
     public GitHubCollectorTask(TaskScheduler taskScheduler,
                                BaseCollectorRepository<Collector> collectorRepository,
-                               GitHubRepoRepository gitHubRepoRepository,
+                               GitHubRepository gitHubRepoRepository,
                                CommitRepository commitRepository,
                                GitRequestRepository gitRequestRepository,
                                GitHubClient gitHubClient,
@@ -92,16 +93,16 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
         protoType.setEnabled(true);
 
         Map<String, Object> allOptions = new HashMap<>();
-        allOptions.put(GitHubRepo.REPO_URL, "");
-        allOptions.put(GitHubRepo.BRANCH, "");
-        allOptions.put(GitHubRepo.USER_ID, "");
-        allOptions.put(GitHubRepo.PASSWORD, "");
-        allOptions.put(GitHubRepo.PERSONAL_ACCESS_TOKEN, "");
+        allOptions.put(GitHub.REPO_URL, "");
+        allOptions.put(GitHub.BRANCH, "");
+        allOptions.put(GitHub.USER_ID, "");
+        allOptions.put(GitHub.PASSWORD, "");
+        allOptions.put(GitHub.PERSONAL_ACCESS_TOKEN, "");
         protoType.setAllFields(allOptions);
 
         Map<String, Object> uniqueOptions = new HashMap<>();
-        uniqueOptions.put(GitHubRepo.REPO_URL, "");
-        uniqueOptions.put(GitHubRepo.BRANCH, "");
+        uniqueOptions.put(GitHub.REPO_URL, "");
+        uniqueOptions.put(GitHub.BRANCH, "");
         protoType.setUniqueFields(uniqueOptions);
         return protoType;
     }
@@ -145,10 +146,10 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
          * Logic: Get all the collector items from the collector_item collection for this collector.
          * If their id is in the unique set (above), keep them enabled; else, disable them.
          */
-        List<GitHubRepo> repoList = new ArrayList<>();
+        List<GitHub> repoList = new ArrayList<>();
         Set<ObjectId> gitID = new HashSet<>();
         gitID.add(collector.getId());
-        for (GitHubRepo repo : gitHubRepoRepository.findByCollectorIdIn(gitID)) {
+        for (GitHub repo : gitHubRepoRepository.findByCollectorIdIn(gitID)) {
             if (repo.isPushed()) {continue;}
 
             repo.setEnabled(uniqueIDs.contains(repo.getId()));
@@ -167,7 +168,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
         int pullCount = 0;
         int issueCount = 0;
        
-        clean(collector);
+        //clean(collector);
         
         String proxyUrl = gitHubSettings.getProxy();
         String proxyPort = gitHubSettings.getProxyPort();
@@ -188,7 +189,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
          }
          }
             
-         for (GitHubRepo repo : enabledRepos(collector)) {
+         for (GitHub repo : enabledRepos(collector)) {
             if (repo.getErrorCount() < gitHubSettings.getErrorThreshold()) {
                 boolean firstRun = ((repo.getLastUpdated() == 0) || ((start - repo.getLastUpdated()) > FOURTEEN_DAYS_MILLISECONDS));
                 repo.removeLastUpdateDate();  //moved last update date to collector item. This is to clean old data.
@@ -259,7 +260,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
     }
 
 
-    private int processList(GitHubRepo repo, List<GitRequest> entries, String type) {
+    private int processList(GitHub repo, List<GitRequest> entries, String type) {
         int count = 0;
         if (CollectionUtils.isEmpty(entries)) return 0;
 
@@ -301,11 +302,11 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
         return StringUtils.isEmpty(response) ? false : response.contains(API_RATE_LIMIT_MESSAGE);
     }
 
-    private List<GitHubRepo> enabledRepos(Collector collector) {
-        List<GitHubRepo> repos = gitHubRepoRepository.findEnabledGitHubRepos(collector.getId());
+    private List<GitHub> enabledRepos(Collector collector) {
+        List<GitHub> repos = (List<GitHub>) gitHubRepoRepository.findEnabledGitHubRepos(collector.getId());
 
-        List<GitHubRepo> pulledRepos
-                = Optional.ofNullable(repos)
+        List<GitHub> pulledRepos 
+                =  (List<GitHub>) Optional.ofNullable(repos)
                 .orElseGet(Collections::emptyList).stream()
                 .filter(pulledRepo -> !pulledRepo.isPushed())
                 .collect(Collectors.toList());
@@ -316,12 +317,12 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
     }
 
 
-    private boolean isNewCommit(GitHubRepo repo, Commit commit) {
+    private boolean isNewCommit(GitHub repo, Commit commit) {
         return commitRepository.findByCollectorItemIdAndScmRevisionNumber(
                 repo.getId(), commit.getScmRevisionNumber()) == null;
     }
 
-    private GitRequest getExistingRequest(GitHubRepo repo, GitRequest request, String type) {
+    private GitRequest getExistingRequest(GitHub repo, GitRequest request, String type) {
         return gitRequestRepository.findByCollectorItemIdAndNumberAndRequestType(
                 repo.getId(), request.getNumber(), type);
     }

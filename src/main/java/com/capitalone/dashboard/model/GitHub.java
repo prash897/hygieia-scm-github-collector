@@ -5,7 +5,7 @@ import java.util.Date;
 /**
  * CollectorItem extension to store the github repo url and branch.
  */
-public class GitHubRepo extends CollectorItem {
+public class GitHub extends CollectorItem {
     public static final String REPO_URL = "url"; // http://github.company.com/jack/somejavacode
     public static final String BRANCH = "branch"; // master, development etc.
     public static final String USER_ID = "userID";
@@ -86,7 +86,7 @@ public class GitHubRepo extends CollectorItem {
         	return false;
         }
 
-        GitHubRepo gitHubRepo = (GitHubRepo) o;
+        GitHub gitHubRepo = (GitHub) o;
 
         return getRepoUrl().equals(gitHubRepo.getRepoUrl()) & getBranch().equals(gitHubRepo.getBranch());
     }

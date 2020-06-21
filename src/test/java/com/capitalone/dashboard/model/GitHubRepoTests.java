@@ -10,21 +10,21 @@ import static org.junit.Assert.assertTrue;
 public class GitHubRepoTests {
 
 	
-	private GitHubRepo githubRepo1;
-	private GitHubRepo githubRepo2;
-	private GitHubRepo githubRepo3;
+	private GitHub githubRepo1;
+	private GitHub githubRepo2;
+	private GitHub githubRepo3;
 	
 	
 	
 	@Before
     public void init() {
-		githubRepo1 = new GitHubRepo();
+		githubRepo1 = new GitHub();
 		githubRepo1.setRepoUrl("https://github.com/capitalone/Hygiea.git");
 		githubRepo1.setBranch("master");
-		githubRepo2 = new GitHubRepo();
+		githubRepo2 = new GitHub();
 		githubRepo2.setRepoUrl("https://github.com/capitalone/Hygiea.git");
         githubRepo2.setBranch("master");
-        githubRepo3=new GitHubRepo();
+        githubRepo3=new GitHub();
         githubRepo3.setRepoUrl("https://github.com/capitalone/Hygieas.git");
         githubRepo3.setBranch("master");
         }

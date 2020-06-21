@@ -8,12 +8,12 @@ import com.capitalone.dashboard.model.CollectorType;
 import com.capitalone.dashboard.model.Commit;
 import com.capitalone.dashboard.model.CommitType;
 import com.capitalone.dashboard.model.Component;
-import com.capitalone.dashboard.model.GitHubRepo;
+import com.capitalone.dashboard.model.GitHub;
 import com.capitalone.dashboard.model.GitRequest;
 import com.capitalone.dashboard.repository.BaseCollectorItemRepository;
 import com.capitalone.dashboard.repository.CommitRepository;
 import com.capitalone.dashboard.repository.ComponentRepository;
-import com.capitalone.dashboard.repository.GitHubRepoRepository;
+import com.capitalone.dashboard.repository.GitHubRepository;
 import com.capitalone.dashboard.repository.GitRequestRepository;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -38,15 +38,15 @@ import static org.mockito.Mockito.when;
 public class GitHubCollectorTaskTest {
 
     @Mock private BaseCollectorItemRepository collectors;
-    @Mock private GitHubRepoRepository gitHubRepoRepository;
+    @Mock private GitHubRepository gitHubRepoRepository;
     @Mock private GitHubClient gitHubClient;
     @Mock private GitHubSettings gitHubSettings;
     @Mock private ComponentRepository dbComponentRepository;
     @Mock private CommitRepository commitRepository;
     @Mock private GitRequestRepository gitRequestRepository;
 
-    @Mock private GitHubRepo repo1;
-    @Mock private GitHubRepo repo2;
+    @Mock private GitHub repo1;
+    @Mock private GitHub repo2;
 
     @Mock private Commit commit;
     @Mock private GitRequest gitRequest;
@@ -229,9 +229,9 @@ public class GitHubCollectorTaskTest {
         gitRequests.add(gitRequest);
         return gitRequests;
     }
-    private List<GitHubRepo> getEnabledRepos() {
-        List<GitHubRepo> gitHubs = new ArrayList<GitHubRepo>();
-        repo1 = new GitHubRepo();
+    private List<GitHub> getEnabledRepos() {
+        List<GitHub> gitHubs = new ArrayList<GitHub>();
+        repo1 = new GitHub();
         repo1.setEnabled(true);
         repo1.setId(new ObjectId("1c1ca42a258ad365fbb64ecc"));
         repo1.setCollectorId(new ObjectId("111ca42a258ad365fbb64ecc"));
@@ -241,9 +241,9 @@ public class GitHubCollectorTaskTest {
         return gitHubs;
     }
 
-    private List<GitHubRepo> getEnabledReposWithErrorCount1() {
-        List<GitHubRepo> gitHubs = new ArrayList<GitHubRepo>();
-        repo1 = new GitHubRepo();
+    private List<GitHub> getEnabledReposWithErrorCount1() {
+        List<GitHub> gitHubs = new ArrayList<GitHub>();
+        repo1 = new GitHub();
         repo1.setEnabled(true);
         repo1.setId(new ObjectId("1c1ca42a258ad365fbb64ecc"));
         repo1.setCollectorId(new ObjectId("111ca42a258ad365fbb64ecc"));
@@ -255,17 +255,17 @@ public class GitHubCollectorTaskTest {
         return gitHubs;
     }
 
-    private ArrayList<GitHubRepo> getGitHubs() {
-        ArrayList<GitHubRepo> gitHubs = new ArrayList<GitHubRepo>();
+    private ArrayList<GitHub> getGitHubs() {
+        ArrayList<GitHub> gitHubs = new ArrayList<GitHub>();
 
-        repo1 = new GitHubRepo();
+        repo1 = new GitHub();
         repo1.setEnabled(true);
         repo1.setId(new ObjectId("1c1ca42a258ad365fbb64ecc"));
         repo1.setCollectorId(new ObjectId("111ca42a258ad365fbb64ecc"));
         repo1.setNiceName("repo1-ci1");
         repo1.setRepoUrl("http://current");
 
-        repo2 = new GitHubRepo();
+        repo2 = new GitHub();
         repo2.setEnabled(true);
         repo2.setId(new ObjectId("1c4ca42a258ad365fbb64ecc"));
         repo2.setCollectorId(new ObjectId("111ca42a258ad365fbb64ecc"));

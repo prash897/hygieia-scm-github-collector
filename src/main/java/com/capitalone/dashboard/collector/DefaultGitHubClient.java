@@ -6,7 +6,7 @@ import com.capitalone.dashboard.model.Commit;
 import com.capitalone.dashboard.model.CommitStatus;
 import com.capitalone.dashboard.model.CommitType;
 import com.capitalone.dashboard.model.GitHubParsed;
-import com.capitalone.dashboard.model.GitHubRepo;
+import com.capitalone.dashboard.model.GitHub;
 import com.capitalone.dashboard.model.GitRequest;
 import com.capitalone.dashboard.model.Review;
 import com.capitalone.dashboard.util.Encryption;
@@ -57,7 +57,7 @@ public class DefaultGitHubClient implements GitHubClient {
 
     private final GitHubSettings settings;
 
-    private final RestOperations restOperations;
+    private final RestOperations restOperations;	
 
     private static final int FIRST_RUN_HISTORY_DEFAULT = 14;
 
@@ -78,7 +78,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @throws HygieiaException
      */
     @Override
-    public List<Commit> getCommits(GitHubRepo repo, boolean firstRun, List<Pattern> commitExclusionPatterns) throws RestClientException, MalformedURLException, HygieiaException {
+    public List<Commit> getCommits(GitHub repo, boolean firstRun, List<Pattern> commitExclusionPatterns) throws RestClientException, MalformedURLException, HygieiaException {
 
         List<Commit> commits = new ArrayList<>();
 
@@ -89,9 +89,9 @@ public class DefaultGitHubClient implements GitHubClient {
 
         String queryUrl = apiUrl.concat("/commits?sha=" + repo.getBranch()
                 + "&since=" + getTimeForApi(getRunDate(repo, firstRun)));
-        String decryptedPassword = decryptString(repo.getPassword(), settings.getKey());
-        String personalAccessToken = (String) repo.getOptions().get("personalAccessToken");
-        String decryptedPersonalAccessToken = decryptString(personalAccessToken, settings.getKey());
+        String decryptedPassword =      repo.getPassword();//decryptString(repo.getPassword(), settings.getKey());
+        String personalAccessToken = (String) repo.getPersonalAccessToken();
+        String decryptedPersonalAccessToken = personalAccessToken;//decryptString(personalAccessToken, settings.getKey());
         boolean lastPage = false;
         String queryUrlPage = queryUrl;
         while (!lastPage) {
@@ -174,7 +174,7 @@ public class DefaultGitHubClient implements GitHubClient {
      */
     @Override
     @SuppressWarnings({"PMD.NPathComplexity", "PMD.ExcessiveMethodLength", "PMD.NcssMethodCount"}) // agreed, fixme
-    public List<GitRequest> getPulls(GitHubRepo repo, String status, boolean firstRun, Map<Long, String> prMap) throws MalformedURLException, HygieiaException {
+    public List<GitRequest> getPulls(GitHub repo, String status, boolean firstRun, Map<Long, String> prMap) throws MalformedURLException, HygieiaException {
 
         List<GitRequest> pulls = new ArrayList<>();
         String decryptedPassword = decryptString(repo.getPassword(), settings.getKey());
@@ -299,7 +299,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @throws HygieiaException
      */
     @Override
-    public List<GitRequest> getIssues(GitHubRepo repo, boolean firstRun) throws
+    public List<GitRequest> getIssues(GitHub repo, boolean firstRun) throws
             MalformedURLException, HygieiaException {
 
         List<GitRequest> issues = new ArrayList<>();
@@ -378,7 +378,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @return
      * @throws RestClientException
      */
-    public List<Comment> getComments(String commentsUrl, GitHubRepo repo) throws RestClientException {
+    public List<Comment> getComments(String commentsUrl, GitHub repo) throws RestClientException {
 
         List<Comment> comments = new ArrayList<>();
 
@@ -432,7 +432,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @return
      * @throws RestClientException
      */
-    public List<CommitStatus> getCommitStatuses(String statusUrl, GitHubRepo repo) throws RestClientException {
+    public List<CommitStatus> getCommitStatuses(String statusUrl, GitHub repo) throws RestClientException {
 
         Map<String, CommitStatus> statuses = new HashMap<>();
 
@@ -478,7 +478,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @return
      * @throws RestClientException
      */
-    public List<Review> getReviews(String reviewsUrl, GitHubRepo repo) throws RestClientException {
+    public List<Review> getReviews(String reviewsUrl, GitHub repo) throws RestClientException {
 
         List<Review> reviews = new ArrayList<>();
 
@@ -657,7 +657,7 @@ public class DefaultGitHubClient implements GitHubClient {
      * @param firstRun
      * @return
      */
-    private Date getRunDate(GitHubRepo repo, boolean firstRun) {
+    private Date getRunDate(GitHub repo, boolean firstRun) {
         if (firstRun) {
             int firstRunDaysHistory = settings.getFirstRunHistoryDays();
             if (firstRunDaysHistory > 0) {
