@@ -35,11 +35,13 @@ import com.capitalone.dashboard.model.Commit;
 import com.capitalone.dashboard.model.CommitType;
 import com.capitalone.dashboard.model.GitHub;
 import com.capitalone.dashboard.model.GitRequest;
+import com.capitalone.dashboard.model.GitTreeObject;
 import com.capitalone.dashboard.repository.BaseCollectorRepository;
 import com.capitalone.dashboard.repository.CommitRepository;
 import com.capitalone.dashboard.repository.ComponentRepository;
 import com.capitalone.dashboard.repository.GitHubRepository;
 import com.capitalone.dashboard.repository.GitRequestRepository;
+import com.capitalone.dashboard.repository.GitTreeObjectRepository;
 
 /**
  * CollectorTask that fetches Commit information from GitHub
@@ -55,6 +57,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
     private final GitHubClient gitHubClient;
     private final GitHubSettings gitHubSettings;
     private final ComponentRepository dbComponentRepository;
+    private final GitTreeObjectRepository<GitTreeObject> gitTreeObjectRepository;
     private static final long FOURTEEN_DAYS_MILLISECONDS = 14 * 24 * 60 * 60 * 1000;
     private static final String API_RATE_LIMIT_MESSAGE = "API rate limit exceeded";
     private List<Pattern> commitExclusionPatterns = new ArrayList<>();
@@ -67,8 +70,10 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
                                GitRequestRepository gitRequestRepository,
                                GitHubClient gitHubClient,
                                GitHubSettings gitHubSettings,
-                               ComponentRepository dbComponentRepository) {
-        super(taskScheduler, "GitHub");
+                               ComponentRepository dbComponentRepository,
+                               GitTreeObjectRepository gitTreeObjectRepository) {
+		super(taskScheduler, "GitHub");
+		this.gitTreeObjectRepository = gitTreeObjectRepository;
         this.collectorRepository = collectorRepository;
         this.gitHubRepoRepository = gitHubRepoRepository;
         this.commitRepository = commitRepository;
@@ -167,6 +172,7 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
         int commitCount = 0;
         int pullCount = 0;
         int issueCount = 0;
+        int gitTreeObjectCount = 0;
        
         //clean(collector);
         
@@ -190,19 +196,16 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
          }
             
          for (GitHub repo : enabledRepos(collector)) {
-            if (repo.getErrorCount() < gitHubSettings.getErrorThreshold()) {
+           // if (repo.getErrorCount() < gitHubSettings.getErrorThreshold()) {
                 boolean firstRun = ((repo.getLastUpdated() == 0) || ((start - repo.getLastUpdated()) > FOURTEEN_DAYS_MILLISECONDS));
                 repo.removeLastUpdateDate();  //moved last update date to collector item. This is to clean old data.
                 try {
                     LOG.info(repo.getOptions().toString() + "::" + repo.getBranch() + ":: get commits");
                     // Step 1: Get all the commits
-                    for (Commit commit : gitHubClient.getCommits(repo, firstRun, commitExclusionPatterns)) {
-                        LOG.debug(commit.getTimestamp() + ":::" + commit.getScmCommitLog());
-                        if (isNewCommit(repo, commit)) {
-                            commit.setCollectorItemId(repo.getId());
-                            commitRepository.save(commit);
-                            commitCount++;
-                        }
+                    for (GitTreeObject gitTreeObject : gitHubClient.getTree(repo, firstRun, commitExclusionPatterns)) {
+                    		gitTreeObject.setRepoObjectId(repo.getId());
+                    		gitTreeObjectRepository.save(gitTreeObject);
+                            gitTreeObjectCount++;
                     }
 
                     // Step 2: Get all the issues
@@ -248,13 +251,14 @@ public class GitHubCollectorTask extends CollectorTask<Collector> {
                     repo.getErrors().add(error);
                 }
                 gitHubRepoRepository.save(repo);
-            }
+            //}
             repoCount++;
         }
         log("Repo Count", start, repoCount);
         log("New Commits", start, commitCount);
         log("New Pulls", start, pullCount);
         log("New Issues", start, issueCount);
+        log("New Git Tree Objects", start, gitTreeObjectCount);
 
         log("Finished", start);
     }

@@ -1,17 +1,20 @@
 package com.capitalone.dashboard.collector;
 
-import com.capitalone.dashboard.misc.HygieiaException;
-import com.capitalone.dashboard.model.Comment;
-import com.capitalone.dashboard.model.Commit;
-import com.capitalone.dashboard.model.CommitStatus;
-import com.capitalone.dashboard.model.CommitType;
-import com.capitalone.dashboard.model.GitHubParsed;
-import com.capitalone.dashboard.model.GitHub;
-import com.capitalone.dashboard.model.GitRequest;
-import com.capitalone.dashboard.model.Review;
-import com.capitalone.dashboard.util.Encryption;
-import com.capitalone.dashboard.util.EncryptionException;
-import com.capitalone.dashboard.util.Supplier;
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -32,19 +35,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestOperations;
 
-import java.io.UnsupportedEncodingException;
-import java.net.MalformedURLException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
-import java.util.regex.Pattern;
+import com.capitalone.dashboard.misc.HygieiaException;
+import com.capitalone.dashboard.model.Comment;
+import com.capitalone.dashboard.model.Commit;
+import com.capitalone.dashboard.model.CommitStatus;
+import com.capitalone.dashboard.model.CommitType;
+import com.capitalone.dashboard.model.GitHub;
+import com.capitalone.dashboard.model.GitHubParsed;
+import com.capitalone.dashboard.model.GitRequest;
+import com.capitalone.dashboard.model.GitTreeObject;
+import com.capitalone.dashboard.model.Review;
+import com.capitalone.dashboard.util.Encryption;
+import com.capitalone.dashboard.util.EncryptionException;
+import com.capitalone.dashboard.util.Supplier;
 
 /**
  * GitHubClient implementation that uses SVNKit to fetch information about
@@ -146,6 +149,60 @@ public class DefaultGitHubClient implements GitHubClient {
             }
         }
         return commits;
+    }
+    
+    /**
+     * Gets commits for a given repo
+     * @param repo
+     * @param firstRun
+     * @return list of commits
+     * @throws RestClientException
+     * @throws MalformedURLException
+     * @throws HygieiaException
+     */
+    
+    static Predicate<JSONObject> templateFinderPredicate= jsonObj -> (jsonObj.get("type").toString().equalsIgnoreCase("blob")); 
+    
+    
+    @Override
+    public List<GitTreeObject> getTree(GitHub repo, boolean firstRun, List<Pattern> commitExclusionPatterns) throws RestClientException, MalformedURLException, HygieiaException {
+    	
+    	List<Commit> commits = new ArrayList<>();
+    	
+    	// format URL
+    	String repoUrl = (String) repo.getOptions().get("url");
+    	GitHubParsed gitHubParsed = new GitHubParsed(repoUrl);
+    	String apiUrl = gitHubParsed.getApiUrl();
+    	
+    	String queryUrl = apiUrl.concat("/git/trees/" + repo.getBranch() + "?recursive=1");
+    	String decryptedPassword = repo.getPassword();//decryptString(repo.getPassword(), settings.getKey());
+    	String personalAccessToken = (String) repo.getPersonalAccessToken();
+    	String decryptedPersonalAccessToken = personalAccessToken;//decryptString(personalAccessToken, settings.getKey());
+    	String queryUrlPage = queryUrl;
+    	List<GitTreeObject> gitObjects = new ArrayList<GitTreeObject>();
+    		LOG.info("Executing " + queryUrlPage);
+    		ResponseEntity<String> response = makeRestCall(queryUrlPage, repo.getUserId(), decryptedPassword,decryptedPersonalAccessToken);
+    		JSONObject treeObject = parseAsObject(response);
+    		JSONArray jsonArray = (JSONArray) treeObject.get("tree");
+    		
+    		jsonArray.parallelStream().filter(templateFinderPredicate).forEach(
+    				
+    				jsonObj -> {
+    					JSONObject jsonO = (JSONObject) jsonObj;
+    					GitTreeObject gitTreeObject = new GitTreeObject();
+    					gitTreeObject.setMode(jsonO.get("mode").toString());
+    					gitTreeObject.setPath(jsonO.get("path").toString());
+    					gitTreeObject.setSha(jsonO.get("sha").toString());
+    					gitTreeObject.setSize(Long.valueOf(jsonO.get("size").toString()));
+    					gitTreeObject.setType(jsonO.get("type").toString());
+    					gitTreeObject.setUrl(jsonO.get("url").toString());
+    					gitTreeObject.setRepoObjectId(repo.getId());
+    					gitTreeObject.setRepoBranch(repo.getBranch());
+    					
+    					gitObjects.add(gitTreeObject);
+    					
+    				});; 
+    	return gitObjects;
     }
 
     private CommitType getCommitType(int parentSize, String commitMessage, List<Pattern> commitExclusionPatterns) {
@@ -718,6 +775,29 @@ public class DefaultGitHubClient implements GitHubClient {
         cal.setTime(dt);
         return String.format("%tFT%<tRZ", cal);
     }
+
+	@Override
+	public JSONObject getContent(GitHub repo, String path) throws MalformedURLException, HygieiaException {
+		// TODO Auto-generated method stub
+		
+		List<Commit> commits = new ArrayList<>();
+    	
+    	// format URL
+    	String repoUrl = (String) repo.getOptions().get("url");
+    	GitHubParsed gitHubParsed = new GitHubParsed(repoUrl);
+    	String apiUrl = gitHubParsed.getApiUrl();
+    	
+    	String queryUrl = apiUrl.concat("/git/contents/" + path + "");
+    	String decryptedPassword = repo.getPassword();//decryptString(repo.getPassword(), settings.getKey());
+    	String personalAccessToken = (String) repo.getPersonalAccessToken();
+    	String decryptedPersonalAccessToken = personalAccessToken;//decryptString(personalAccessToken, settings.getKey());
+    	String queryUrlPage = queryUrl;
+    	List<GitTreeObject> gitObjects = new ArrayList<GitTreeObject>();
+		LOG.info("Executing " + queryUrlPage);
+		ResponseEntity<String> response = makeRestCall(queryUrlPage, repo.getUserId(), decryptedPassword,decryptedPersonalAccessToken);
+		JSONObject contentObject = parseAsObject(response);
+		return contentObject;
+	}
 }
 
 // X-RateLimit-Remaining
